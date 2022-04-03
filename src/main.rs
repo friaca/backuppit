@@ -1,13 +1,13 @@
 use std::env::{var};
 use std::error::Error;
-use reqwest::header::{CONTENT_TYPE, AUTHORIZATION, USER_AGENT};
-use reqwest::StatusCode;
+
 use base64;
+use clap::Parser;
+use dotenv::dotenv;
 use serde::{Serialize, Deserialize};
 use serde_json;
-
-use dotenv::dotenv;
-use clap::Parser;
+use reqwest::StatusCode;
+use reqwest::header::{CONTENT_TYPE, AUTHORIZATION, USER_AGENT};
 
 #[derive(Parser, Debug)]
 struct CliArgs {
