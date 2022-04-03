@@ -1,9 +1,7 @@
 use std::env::{var};
 use std::error::Error;
 
-use base64;
 use clap::Parser;
-use dotenv::dotenv;
 use serde::{Serialize, Deserialize};
 use serde_json;
 use reqwest::StatusCode;
@@ -21,5 +19,4 @@ struct CliArgs {
 
 fn main() {
     CliArgs::parse();
-    dotenv().ok();
 }
