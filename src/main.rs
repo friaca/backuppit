@@ -52,7 +52,7 @@ fn get_reddit_token(username: &str, password: &str, app_id: &str, app_secret: &s
         .send()?;
 
     if response.status() == StatusCode::OK {
-        // For some reason, some error responses like "invalid_grant" returns inside a OK HTTP response
+        // For some reason, reddit returns some error responses like "invalid_grant" inside an OK HTTP response
         // so we have to double check if the response is the right JSON
         match parse_token_response(response) {
             Ok(valid_token) => Ok(valid_token),
