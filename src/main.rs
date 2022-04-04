@@ -75,4 +75,5 @@ fn main() {
     };
 
     save_post(post_content, args.output);
+    println!("Post saved succesfully!");
 }
