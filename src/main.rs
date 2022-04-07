@@ -53,12 +53,9 @@ fn get_reddit_post(url: &str) -> Result<String, Box<dyn Error>> {
     let client = reqwest::blocking::Client::new();
     let response = client.get(url)
         .header(USER_AGENT, "backuppit")
-        .send();
+        .send()?;
     
-    match response {
-        Ok(resp) => Ok(resp.text()?),
-        Err(e) => Err(e.into())
-    }
+    Ok(response.text()?)
 }
 
 fn main() {
