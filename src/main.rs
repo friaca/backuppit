@@ -69,10 +69,7 @@ fn main() {
         None => panic!("Post ID is not valid")
     };
 
-    let post_content = match get_reddit_post(&url) {
-        Ok(content) => content,
-        Err(e) => panic!("{}", e)
-    };
+    let post_content = get_reddit_post(&url).expect("Couldn't GET Reddit post"); 
 
     save_post(post_content, args.output);
     println!("Post saved succesfully!");
