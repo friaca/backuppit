@@ -2,6 +2,8 @@ use clap::Parser;
 use regex::Regex;
 use reqwest::header::USER_AGENT;
 
+pub mod response;
+
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
@@ -16,7 +18,22 @@ pub struct CliArgs {
   output: std::path::PathBuf,
 }
 
-fn try_extract_post_id(input: &str) -> Option<String> {
+fn get_post_info(response_json: &response::BasicListingVec<serde_json::Value>) -> serde_json::Value {
+  response_json[0].data.children[0].data.clone()
+}
+
+fn format_file(content: &serde_json::Value) -> String {
+  format!(
+"---
+Author: {}
+Subreddit: {}
+Title: {}
+---
+{}", 
+    content["author"], content["subreddit"], content["title"], content["selftext"])
+}
+
+fn extract_post_id(input: &str) -> Option<String> {
   let regexes = [
     /* Singular ID */
     Regex::new(r"^([\w\d]{6})$").unwrap(),
@@ -38,12 +55,12 @@ fn try_extract_post_id(input: &str) -> Option<String> {
   None
 }
 
-fn get_valid_reddit_url(post_id: &str) -> String {
+fn format_reddit_url(post_id: &str) -> String {
   format!("https://www.reddit.com/{}/.json", post_id)
 }
 
-fn save_post(content: String, path: std::path::PathBuf) {
-  let filename = std::path::Path::new("output.json");
+fn save_file(content: String, path: std::path::PathBuf) {
+  let filename = std::path::Path::new("output.md");
   let full_path = path.join(filename);
   let mut file = File::create(full_path)
     .expect("Couldn't create file, do you have access to the provived output path?");
@@ -52,21 +69,26 @@ fn save_post(content: String, path: std::path::PathBuf) {
     .expect("Couldn't write file, do you have rights do modify files in the provived output path?");
 }
 
-fn get_reddit_post(url: &str) -> Result<String, Box<dyn Error>> {
+fn get_reddit_post(url: &str) -> Result<response::BasicListingVec<serde_json::Value>, Box<dyn Error>> {
   let client = reqwest::blocking::Client::new();
   let response = client.get(url).header(USER_AGENT, "backuppit").send()?;
 
-  Ok(response.text()?)
+  Ok(response.json()?)
 }
 
 pub fn run(args: CliArgs) {
-  let url = match try_extract_post_id(&args.post_id) {
-    Some(post_id) => get_valid_reddit_url(&post_id),
+  let url = match extract_post_id(&args.post_id) {
+    Some(post_id) => format_reddit_url(&post_id),
     None => panic!("Invalid post ID"),
   };
 
-  let post_content = get_reddit_post(&url).expect("Couldn't GET Reddit post");
+  let post_content = match get_reddit_post(&url) {
+    Ok(response) => get_post_info(&response),
+    Err(e) => panic!("Invalid response: {:?}", e)
+  };
 
-  save_post(post_content, args.output);
+  let file_content = format_file(&post_content);
+
+  save_file(file_content, args.output);
   println!("Post saved succesfully!");
 }

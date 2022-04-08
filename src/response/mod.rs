@@ -1,4 +1,4 @@
-// https://github.com/halcyonnouveau/roux/blob/master/src/responses/mod.rs
+
 use serde::Deserialize;
 
 /// Basic structure of a Reddit response.
@@ -29,3 +29,8 @@ pub struct Listing<T> {
 
 /// Often times a basic thing will have this structure.
 pub type BasicListing<T> = BasicThing<Listing<BasicThing<T>>>;
+
+/// Structure of requested URL in Backuppit
+/// [ { kind, data }, { kind, data } ]
+/// First one is the post itself, second one is the comments 
+pub type BasicListingVec<T> = Vec<BasicThing<Listing<BasicThing<T>>>>;
