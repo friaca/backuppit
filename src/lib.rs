@@ -2,7 +2,8 @@ use clap::Parser;
 use regex::Regex;
 use reqwest::header::USER_AGENT;
 
-pub mod response;
+mod response;
+mod template;
 
 use std::error::Error;
 use std::fs::File;
@@ -22,16 +23,7 @@ fn get_post_info(response_json: &response::BasicListingVec<serde_json::Value>) -
   response_json[0].data.children[0].data.clone()
 }
 
-fn format_file(content: &serde_json::Value) -> String {
-  format!(
-"---
-Author: {}
-Subreddit: {}
-Title: {}
----
-{}", 
-    content["author"], content["subreddit"], content["title"], content["selftext"])
-}
+
 
 fn extract_post_id(input: &str) -> Option<String> {
   let regexes = [
@@ -87,7 +79,7 @@ pub fn run(args: CliArgs) {
     Err(e) => panic!("Invalid response: {:?}", e)
   };
 
-  let file_content = format_file(&post_content);
+  let file_content = template::format_md_file(&post_content);
 
   save_file(file_content, args.output);
   println!("Post saved succesfully!");
