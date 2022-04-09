@@ -1,5 +1,6 @@
 use clap::Parser;
 use regex::Regex;
+use serde_json::Value;
 use reqwest::header::USER_AGENT;
 
 mod response;
@@ -19,11 +20,11 @@ pub struct CliArgs {
   output: std::path::PathBuf,
 }
 
-fn get_post_info(response_json: &response::BasicListingVec<serde_json::Value>) -> serde_json::Value {
+fn get_post_info(
+  response_json: &response::BasicListingVec<serde_json::Value>,
+) -> serde_json::Value {
   response_json[0].data.children[0].data.clone()
 }
-
-
 
 fn extract_post_id(input: &str) -> Option<String> {
   let regexes = [
@@ -51,6 +52,31 @@ fn format_reddit_url(post_id: &str) -> String {
   format!("https://www.reddit.com/{}/.json", post_id)
 }
 
+fn try_save_images(post_content: &Value, path: &std::path::PathBuf) -> Result<(), Box<dyn Error>> {
+  if post_content["is_reddit_media_domain"].as_bool().unwrap() {
+    save_image(&post_content["url"].as_str().unwrap(), path)?
+  } else if post_content["is_gallery"].as_bool().unwrap() {
+    todo!()
+  }
+
+  println!("Image(s) saved successfully!");
+  Ok(())
+}
+
+fn save_image(url: &str, path: &std::path::PathBuf) -> Result<(), Box<dyn Error>> {
+  let filename = std::path::Path::new("image.png");
+  let client = reqwest::blocking::Client::new();
+  let mut image_response = client
+    .get(url)
+    .header(USER_AGENT, "backuppit v0.1.0")
+    .send()?;
+
+  let mut file = File::create(&path.join(filename)).expect("Couldn't create image file: ");
+  std::io::copy(&mut image_response, &mut file).expect("Couldn't save image: ");
+
+  Ok(())
+}
+
 fn save_file(content: String, path: std::path::PathBuf) {
   let filename = std::path::Path::new("output.md");
   let full_path = path.join(filename);
@@ -61,9 +87,14 @@ fn save_file(content: String, path: std::path::PathBuf) {
     .expect("Couldn't write file, do you have rights do modify files in the provived output path?");
 }
 
-fn get_reddit_post(url: &str) -> Result<response::BasicListingVec<serde_json::Value>, Box<dyn Error>> {
+fn get_reddit_post(
+  url: &str,
+) -> Result<response::BasicListingVec<serde_json::Value>, Box<dyn Error>> {
   let client = reqwest::blocking::Client::new();
-  let response = client.get(url).header(USER_AGENT, "backuppit").send()?;
+  let response = client
+    .get(url)
+    .header(USER_AGENT, "backuppit v0.1.0")
+    .send()?;
 
   Ok(response.json()?)
 }
@@ -76,8 +107,10 @@ pub fn run(args: CliArgs) {
 
   let post_content = match get_reddit_post(&url) {
     Ok(response) => get_post_info(&response),
-    Err(e) => panic!("Invalid response: {:?}", e)
+    Err(e) => panic!("Invalid response: {:?}", e),
   };
+
+  try_save_images(&post_content, &args.output).expect("");
 
   let file_content = template::format_md_file(&post_content);
 
