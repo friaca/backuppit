@@ -36,7 +36,7 @@ fn extract_post_id(input: &str) -> Option<String> {
     Regex::new(r"^https://www\.reddit\.com/.+comments/([\w\d]{6})/?").unwrap(),
   ];
 
-  for re in regexes.iter() {
+  for re in regexes {
     let captures = re.captures(input);
     if captures.is_none() {
       continue;
@@ -52,19 +52,53 @@ fn format_reddit_url(post_id: &str) -> String {
   format!("https://www.reddit.com/{}/.json", post_id)
 }
 
+fn format_reddit_media_url(media_id: &str, extension: &str) -> String {
+  format!("https://i.redd.it/{}.{}", media_id, extension)
+}
+
+fn get_media_filename_from_url(url: &str) -> String {
+  let filename_regex = Regex::new(r"/([\w\d]{13}\.\w+)$").unwrap();
+  filename_regex.captures(url).unwrap().get(1).unwrap().as_str().to_owned()
+}
+
 fn try_save_images(post_content: &Value, path: &std::path::PathBuf) -> Result<(), Box<dyn Error>> {
   if post_content["is_reddit_media_domain"].as_bool().unwrap() {
-    save_image(&post_content["url"].as_str().unwrap(), path)?
+    save_image(
+      &post_content["url"].as_str().unwrap(), 
+      &get_media_filename_from_url(&post_content["url"].as_str().unwrap()), 
+      path
+    )?
   } else if post_content["is_gallery"].as_bool().unwrap() {
-    todo!()
+    let image_urls = get_gallery_urls(&post_content["media_metadata"]);
+
+    for url in image_urls {
+      save_image(&url, &get_media_filename_from_url(&url), path)?;
+    }
   }
 
   println!("Image(s) saved successfully!");
   Ok(())
 }
 
-fn save_image(url: &str, path: &std::path::PathBuf) -> Result<(), Box<dyn Error>> {
-  let filename = std::path::Path::new("image.png");
+fn get_gallery_urls(media_metadata: &Value) -> Vec<String> {
+  let mut urls: Vec<String> = vec![];
+
+  for media in media_metadata.as_object() {
+    for (_, value) in media.iter() {
+      // value["m"] == "image/png" | "image/jpg" | ...
+      let media_type = &value["m"].as_str().unwrap()[..6];
+      if media_type != "image/" { continue; }
+
+      let extension = &value["m"].as_str().unwrap()[6..];
+      urls.push(format_reddit_media_url(value["id"].as_str().unwrap(), &extension));
+    }
+  }
+
+  urls
+}
+
+fn save_image(url: &str, filename: &str, path: &std::path::PathBuf) -> Result<(), Box<dyn Error>> {
+  let filename = std::path::Path::new(filename);
   let client = reqwest::blocking::Client::new();
   let mut image_response = client
     .get(url)
