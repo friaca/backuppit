@@ -133,7 +133,7 @@ fn get_reddit_post(
   Ok(response.json()?)
 }
 
-pub fn run(args: CliArgs) {
+pub fn run(args: CliArgs) -> Result<(), Box<dyn Error>> {
   let url = match extract_post_id(&args.post_id) {
     Some(post_id) => format_reddit_url(&post_id),
     None => panic!("Invalid post ID"),
@@ -144,10 +144,12 @@ pub fn run(args: CliArgs) {
     Err(e) => panic!("Invalid response: {:?}", e),
   };
 
-  try_save_images(&post_content, &args.output).expect("");
+  try_save_images(&post_content, &args.output)?;
 
   let file_content = template::format_md_file(&post_content);
 
   save_file(file_content, args.output);
   println!("Post saved succesfully!");
+  
+  Ok(())
 }
