@@ -82,6 +82,9 @@ fn try_save_images(post_content: &Value, path: &std::path::PathBuf) -> Result<()
     for url in image_urls {
       save_image(&url, &get_media_filename_from_url(&url), path)?;
     }
+  } else {
+    // No images
+    return Ok(());
   }
 
   println!("Image(s) saved successfully!");
@@ -150,6 +153,7 @@ pub fn run(args: CliArgs) -> Result<(), Box<dyn Error>> {
     None => panic!("Invalid post ID"),
   };
 
+  println!("Obtaining post...");
   let post_content = match get_reddit_post(&url) {
     Ok(response) => get_post_info(&response),
     Err(e) => panic!("Invalid response: {:?}", e),
