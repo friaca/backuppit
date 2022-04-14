@@ -1,7 +1,7 @@
 use clap::Parser;
 use regex::Regex;
 use reqwest::header::USER_AGENT;
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 mod response;
 use response::BasicListingVec;
@@ -70,44 +70,56 @@ fn get_media_filename_from_url(url: &str) -> String {
 }
 
 fn try_save_images(post_content: &Value, path: &std::path::PathBuf) -> Result<(), Box<dyn Error>> {
-  if post_content["is_reddit_media_domain"].as_bool().unwrap() {
-    save_image(
+  match (
+    post_content["is_reddit_media_domain"].as_bool(),
+    post_content["is_gallery"].as_bool(),
+    post_content["media_metadata"].as_object(),
+  ) {
+    (Some(true), _, _) => save_image(
       &post_content["url"].as_str().unwrap(),
       &get_media_filename_from_url(&post_content["url"].as_str().unwrap()),
       path,
-    )?
-  } else if post_content["is_gallery"].as_bool().unwrap() {
-    let image_urls = get_gallery_urls(&post_content["media_metadata"]);
-
-    for url in image_urls {
-      save_image(&url, &get_media_filename_from_url(&url), path)?;
-    }
-  } else {
-    // No images
-    return Ok(());
-  }
+    )?,
+    (_, Some(true), Some(media_metadata)) => {
+      save_multiple_images(media_metadata, path)?;
+      return Ok(());
+    },
+    (_, _, Some(media_metadata)) => {
+      save_multiple_images(media_metadata, path)?;
+      return Ok(());
+    },
+    _ => return Ok(()),
+  };
 
   println!("Image(s) saved successfully!");
   Ok(())
 }
 
-fn get_gallery_urls(media_metadata: &Value) -> Vec<String> {
+fn save_multiple_images(media_metadata: &Map<String, Value>, path: &std::path::PathBuf) -> Result<(), Box<dyn Error>> {
+  let image_urls = get_gallery_urls(&media_metadata);
+
+  for url in image_urls {
+    save_image(&url, &get_media_filename_from_url(&url), path)?;
+  }
+
+  Ok(())
+}
+
+fn get_gallery_urls(media_metadata: &Map<String, Value>) -> Vec<String> {
   let mut urls: Vec<String> = vec![];
 
-  for media in media_metadata.as_object() {
-    for (_, value) in media.iter() {
-      // value["m"] == "image/png" | "image/jpg" | ...
-      let media_type = &value["m"].as_str().unwrap()[..6];
-      if media_type != "image/" {
-        continue;
-      }
-
-      let extension = &value["m"].as_str().unwrap()[6..];
-      urls.push(format_reddit_media_url(
-        value["id"].as_str().unwrap(),
-        &extension,
-      ));
+  for (_, value) in media_metadata {
+    // value["m"] == "image/png" | "image/jpg" | ...
+    let media_type = &value["m"].as_str().unwrap()[..6];
+    if media_type != "image/" {
+      continue;
     }
+
+    let extension = &value["m"].as_str().unwrap()[6..];
+    urls.push(format_reddit_media_url(
+      value["id"].as_str().unwrap(),
+      &extension,
+    ));
   }
 
   urls
