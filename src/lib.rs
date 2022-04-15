@@ -69,7 +69,7 @@ fn get_media_filename_from_url(url: &str) -> String {
     .to_owned()
 }
 
-fn try_save_images(post_content: &Value, path: &std::path::PathBuf) -> Result<(), Box<dyn Error>> {
+fn try_save_images(post_content: &Value, path: &std::path::PathBuf) -> Result<Option<Vec<String>>, Box<dyn Error>> {
   match (
     post_content["is_reddit_media_domain"].as_bool(),
     post_content["is_gallery"].as_bool(),
@@ -82,17 +82,27 @@ fn try_save_images(post_content: &Value, path: &std::path::PathBuf) -> Result<()
     )?,
     (_, Some(true), Some(media_metadata)) => {
       save_multiple_images(media_metadata, path)?;
-      return Ok(());
+      return Ok(Some(get_media_metadata_ids(media_metadata)));
     },
     (_, _, Some(media_metadata)) => {
       save_multiple_images(media_metadata, path)?;
-      return Ok(());
+      return Ok(Some(get_media_metadata_ids(media_metadata)));
     },
-    _ => return Ok(()),
+    _ => return Ok(None),
   };
 
   println!("Image(s) saved successfully!");
-  Ok(())
+  Ok(None)
+}
+
+fn get_media_metadata_ids(media_metadata: &Map<String, Value>) -> Vec<String> {
+  media_metadata.iter()
+    .filter(|(_, media)| { &media["m"].as_str().unwrap()[..6] == "image/" })
+    .map(|(_, media)| { 
+      let extension = &media["m"].as_str().unwrap()[6..];
+      format!("{}.{}", media["id"].as_str().unwrap(), extension) 
+    })
+    .collect()
 }
 
 fn save_multiple_images(media_metadata: &Map<String, Value>, path: &std::path::PathBuf) -> Result<(), Box<dyn Error>> {
@@ -171,9 +181,9 @@ pub fn run(args: CliArgs) -> Result<(), Box<dyn Error>> {
     Err(e) => panic!("Invalid response: {:?}", e),
   };
 
-  try_save_images(&post_content, &args.output)?;
+  let media_ids = try_save_images(&post_content, &args.output)?;
 
-  let file_content = template::format_md_file(&post_content);
+  let file_content = template::format_md_file(&post_content, media_ids);
 
   save_file(file_content, args.output);
   println!("Post saved succesfully!");
